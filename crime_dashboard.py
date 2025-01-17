@@ -9,6 +9,27 @@ from matplotlib import rcParams
 rcParams['font.family'] = 'Arial'
 rcParams['axes.unicode_minus'] = False  # Ensure minus signs display correctly
 
+# Add custom CSS styling for RTL support
+st.markdown(
+    """
+    <style>
+    body {
+        direction: rtl;
+        text-align: right;
+    }
+    .css-18e3th9 {
+        direction: rtl;
+        text-align: right;
+    }
+    .css-1d391kg {
+        direction: rtl;
+        text-align: right;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Function to load and process data
 def load_data():
     urls = {
@@ -24,11 +45,11 @@ def load_data():
         data = response.json()
         records = data['result']['records']
         df = pd.DataFrame(records)
-        df['Year'] = year  # Add year column
+        df['Year'] = year  # Add a year column
         data_frames.append(df)
     return pd.concat(data_frames, ignore_index=True)
 
-# Load data
+# Load the data
 st.title("פשע בישראל (2020-2024)")
 st.sidebar.header("אפשרויות סינון")
 df_all = load_data()
@@ -41,20 +62,20 @@ df_all["StatisticGroup"] = df_all["StatisticGroup"].astype(str)
 years = st.sidebar.multiselect("בחר שנים", sorted(df_all["Year"].unique()), default=sorted(df_all["Year"].unique()))
 crime_types = st.sidebar.multiselect("בחר סוגי פשעים", df_all["StatisticGroup"].unique(), default=df_all["StatisticGroup"].unique())
 
-# Filter data based on user selection
+# Filter the data based on user selection
 filtered_data = df_all[(df_all["Year"].isin(years)) & (df_all["StatisticGroup"].isin(crime_types))]
 
-# Visualization
+# Visualization of crime trends
 st.subheader("מגמות פשע לפי סוג")
 if filtered_data.empty:
     st.write("אין נתונים זמינים עבור הבחירה.")
 else:
-    # Group and plot
+    # Group and plot the data
     crime_counts = filtered_data.groupby(["Year", "StatisticGroup"]).size().unstack(fill_value=0)
     fig, ax = plt.subplots(figsize=(12, 6))
     crime_counts.plot(kind="bar", ax=ax, width=0.8)
 
-    # Hebrew titles and labels
+    # Set Hebrew titles and labels
     ax.set_title("מגמות פשע לאורך השנים", fontsize=16, loc="center", horizontalalignment='center')
     ax.set_xlabel("שנה", fontsize=14)
     ax.set_ylabel("מספר הפשעים", fontsize=14)
@@ -64,5 +85,7 @@ else:
 
     st.pyplot(fig)
 
-# Display filtered data
+# Display the filtered data
+st.subheader("תצוגה מקדימה של נתונים מסוננים")
+st.dataframe(filtered_data)
     
