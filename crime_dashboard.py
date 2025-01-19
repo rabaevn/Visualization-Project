@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -11,7 +10,7 @@ rcParams['axes.unicode_minus'] = False  # Ensure minus signs display correctly
 
 # Add custom CSS styling for RTL support
 st.markdown(
-    """
+    \"\"\"
     <style>
     body {
         direction: rtl;
@@ -26,7 +25,7 @@ st.markdown(
         text-align: right;
     }
     </style>
-    """,
+    \"\"\",
     unsafe_allow_html=True,
 )
 
@@ -46,6 +45,8 @@ def load_data():
         records = data['result']['records']
         df = pd.DataFrame(records)
         df['Year'] = year  # Add a year column
+        # reverse statisticType column for Hebrew
+        df["ReversedStatisticGroup"] = df["StatisticGroup"].apply(lambda x: x[::-1])
         data_frames.append(df)
     return pd.concat(data_frames, ignore_index=True)
 
@@ -71,21 +72,50 @@ if filtered_data.empty:
     st.write("אין נתונים זמינים עבור הבחירה.")
 else:
     # Group and plot the data
-    crime_counts = filtered_data.groupby(["Year", "StatisticGroup"]).size().unstack(fill_value=0)
+    crime_counts = filtered_data.groupby(["Year", "ReversedStatisticGroup"]).size().unstack(fill_value=0)
     fig, ax = plt.subplots(figsize=(12, 6))
     crime_counts.plot(kind="bar", ax=ax, width=0.8)
 
-    # Set Hebrew titles and labels
-    ax.set_title("מגמות פשע לאורך השנים", fontsize=16, loc="center", horizontalalignment='center')
-    ax.set_xlabel("שנה", fontsize=14)
-    ax.set_ylabel("מספר הפשעים", fontsize=14)
-    ax.legend(title="סוג פשע", bbox_to_anchor=(1.05, 1), loc="upper left")
+    # Set Hebrew titles and labels with reversed text
+    ax.set_title("םינשה ךרואל עשפ תומגמ", fontsize=16, loc="center", horizontalalignment='center')
+    ax.set_xlabel("הנש", fontsize=14)
+    ax.set_ylabel("םיעשפ רפסמ", fontsize=14)
+    ax.legend(title="עשפ גוס", bbox_to_anchor=(1.05, 1), loc="upper left")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=0, fontsize=12)
     plt.tight_layout()
+
 
     st.pyplot(fig)
 
 # Display the filtered data
-st.subheader("תצוגה מקדימה של נתונים מסוננים")
-st.dataframe(filtered_data)
-    
+
+
+### overview visualization
+df = load_data()
+st.title("Crime Analysis Dashboard")
+st.title("Crime Analysis Dashboard")
+st.sidebar.header("Filter Options")
+
+# Dropdown menu for years
+years = ["All Years"] + sorted(df["Year"].dropna().unique().astype(int).tolist())
+selected_year = st.sidebar.selectbox("Select Year:", years)
+
+# Filter data based on selected year
+if selected_year == "All Years":
+    filtered_data = df
+else:
+    filtered_data = df[df["Year"] == int(selected_year)]
+
+# Group by crime type and count
+crime_counts = filtered_data.groupby("ReversedStatisticGroup").size()
+
+# Visualization
+st.subheader("Crime Counts by Type")
+fig, ax = plt.subplots(figsize=(12, 6))
+
+
+# Set Hebrew labels
+ax.set_title("מספר הפשעים לפי סוג", fontsize=16)
+ax.set_xlabel("מספר הפשעים", fontsize=14)
+ax.set_ylabel("סוג הפשע", fontsize=14)
+ax.tick_params(axis="y", labelrotation=0)  # Keep Hebrew labels readable
