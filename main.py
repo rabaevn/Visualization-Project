@@ -1,3 +1,4 @@
+import plotly.express as px
 import streamlit as st
 import pandas as pd
 import requests
@@ -50,7 +51,21 @@ def categorize_statistic_group(stat_group):
             return category
     return None
 
+def preprocess_data_district(df):
+    """
+    preprocessed the districts names
+    :param df: out data frame
+    :return: pandas df with the district names preprocessed
+    """
+    # remove nan values
+    filtered_df = df[~df["PoliceDistrict"].isin(["כל הארץ", ""])]
 
+    # make a joined district
+    aggregated_df = filtered_df.groupby(["Category", "Period"]).agg({"Count": "sum"}).reset_index()
+    aggregated_df["PoliceDistrict"] = "כל המחוזות"
+    combined_df = pd.concat([filtered_df, aggregated_df], ignore_index=True)
+
+    return combined_df
 
 # Streamlit layout
 st.title("Crime Analysis Dashboard")
@@ -130,3 +145,96 @@ if menu_option == 'Overview':
 
     # Display plot
     st.pyplot(fig)
+elif menu_option == 'October 7th':
+    # Load and process data
+    df = load_data()
+    df["Quarter"] = df["Quarter"].str.extract(r"(\d)").astype(float)
+    df["Period"] = "לפני ה7.10"
+    df.loc[(df["Year"] == 2023) & (df["Quarter"] > 3), "Period"] = "אחרי ה7.10"
+    df.loc[df["Year"] == 2024, "Period"] = "אחרי ה7.10"
+
+    # Categorize statistic groups
+    df["Category"] = df["StatisticGroup"].apply(categorize_statistic_group)
+
+    # Drop rows where Category is None (uncategorized values)
+    df = df.dropna(subset=["Category"])
+
+    # Group by necessary fields
+    grouped = df.groupby(["Category", "Period", "PoliceDistrict"]).size().reset_index(name="Count")
+
+    # Apply preprocessing
+    grouped = preprocess_data_district(grouped)
+
+    # Normalize by quarter count
+    quarters_before = (2023 - 2020) * 4 + 3  # First quarter of 2020 to third quarter of 2023
+    quarters_after = 5  # Fourth quarter of 2023 to fourth quarter of 2024
+
+    grouped["NormalizedCount"] = grouped.apply(
+        lambda row: row["Count"] / quarters_before if row["Period"] == "לפני ה7.10" else row["Count"] / quarters_after,
+        axis=1
+    )
+
+    districts = sorted(
+        grouped["PoliceDistrict"].unique(),
+        key=lambda x: (x != "כל המחוזות", x)
+    )
+
+    # Title
+    st.title("השוואת פשיעה לפי סוגי עבירות ומחוזות")
+
+    # Dropdown for selecting district
+    selected_district = st.selectbox(
+        "בחר מחוז:",
+        districts,
+        index=0  # Default to "כל המחוזות"
+    )
+
+    # Filter data based on selected district
+    if selected_district == "כל המחוזות":
+        filtered_df = grouped
+    else:
+        filtered_df = grouped[grouped["PoliceDistrict"] == selected_district]
+
+    aggregated_df = filtered_df.groupby(["Category", "Period"], as_index=False)["NormalizedCount"].sum()
+
+    # Pivot the aggregated data
+    pivot_df = (
+        aggregated_df.pivot(index="Category", columns="Period", values="NormalizedCount")
+        .fillna(0)  # Fill missing values with 0
+        .reset_index()
+    )
+
+    # Adjust Y-axis based on selected district
+    if selected_district == "כל המחוזות":
+        y_tick_interval = 500
+        y_max = 4000
+    elif selected_district in districts:
+        y_tick_interval = 100
+        y_max = 1000
+    else:
+        y_tick_interval = 100
+        y_max = 1000  # Default for other districts
+
+    # Generate bar chart
+    fig = px.bar(
+        pivot_df,
+        x="Category",
+        y=["לפני ה7.10", "אחרי ה7.10"],
+        barmode="group",
+        labels={"value": "כמות עבירות מנורמלת", "variable": "תקופה"},
+        title=f"פשיעה במחוז: {selected_district}"
+    ).update_layout(
+        xaxis_title="סוגי עבירות",
+        yaxis_title="כמות עבירות מנורמלת",
+        legend_title="תקופה",
+        plot_bgcolor="#f9f9f9",
+        yaxis=dict(
+            tickmode="linear",
+            tick0=0,
+            dtick=y_tick_interval,  # Set tick interval based on district
+            range=[0, y_max]  # Set upper limit based on district
+        )
+    )
+
+    # Display bar chart
+    st.plotly_chart(fig)
