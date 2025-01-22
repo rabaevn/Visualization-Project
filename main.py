@@ -145,9 +145,13 @@ if menu_option == 'Overview':
 
     # Display plot
     st.pyplot(fig)
+
+
+
+
 elif menu_option == 'October 7th':
     # Load and process data
-    df = load_data()
+    df = load_data()  # Ensure this function is defined and loads the correct dataset
     df["Quarter"] = df["Quarter"].str.extract(r"(\d)").astype(float)
     df["Period"] = "לפני ה7.10"
     df.loc[(df["Year"] == 2023) & (df["Quarter"] > 3), "Period"] = "אחרי ה7.10"
@@ -174,19 +178,78 @@ elif menu_option == 'October 7th':
         axis=1
     )
 
+    # Define districts
     districts = sorted(
         grouped["PoliceDistrict"].unique(),
         key=lambda x: (x != "כל המחוזות", x)
     )
 
     # Title
-    st.title("השוואת פשיעה לפי סוגי עבירות ומחוזות")
+    st.markdown(
+        '<h1 style="text-align: right; font-size: 36px; direction: rtl;">השוואת פשיעה לפי סוגי עבירות ומחוזות</h1>',
+        unsafe_allow_html=True
+    )
 
-    # Dropdown for selecting district
+    # Label and Dropdown styling
+    st.markdown("""
+        <style>
+        /* Set the selectbox width */
+        div[data-testid="stSelectbox"] > div {
+            width: 200px;
+        }
+
+        /* Align the selectbox to the right */
+        div[data-testid="stSelectbox"] {
+            text-align: right;
+            direction: rtl;
+            margin-right: 10%;
+            margin-top: -15px; /* Adjust space between label and dropdown */
+        }
+
+        /* Align dropdown items (listbox) to the right */
+        div[role="listbox"] {
+            text-align: right !important;
+            direction: rtl !important;
+        }
+
+        /* Additional alignment for labels */
+        label {
+            text-align: right !important;
+            direction: rtl;
+            margin-right: 10%;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Label for the dropdown
+    st.markdown("""
+        <style>
+        /* Align the label and dropdown to the right */
+        div[data-testid="stSelectbox"] > label {
+            text-align: right !important;
+            direction: rtl !important;
+            display: block;
+            margin-right: 10%; /* Add margin to align properly */
+            margin-bottom: 5px; /* Space between label and dropdown */
+        }
+
+        /* Align the dropdown box itself */
+        div[data-testid="stSelectbox"] > div {
+            text-align: right !important;
+            direction: rtl !important;
+            margin-right: 10%;
+        }
+        </style>
+        <div style="text-align: right; direction: rtl; margin-right: 10%; font-size: 18px;">
+            בחר מחוז:
+        </div>
+    """, unsafe_allow_html=True)
+
     selected_district = st.selectbox(
-        "בחר מחוז:",
+        "",
         districts,
-        index=0  # Default to "כל המחוזות"
+        index=0,  # Default to "כל המחוזות"
+        key="district-selector"
     )
 
     # Filter data based on selected district
@@ -195,6 +258,7 @@ elif menu_option == 'October 7th':
     else:
         filtered_df = grouped[grouped["PoliceDistrict"] == selected_district]
 
+    # Aggregate data
     aggregated_df = filtered_df.groupby(["Category", "Period"], as_index=False)["NormalizedCount"].sum()
 
     # Pivot the aggregated data
@@ -208,26 +272,29 @@ elif menu_option == 'October 7th':
     if selected_district == "כל המחוזות":
         y_tick_interval = 500
         y_max = 4000
-    elif selected_district in districts:
-        y_tick_interval = 100
-        y_max = 1000
     else:
         y_tick_interval = 100
-        y_max = 1000  # Default for other districts
+        y_max = 1000
 
-    # Generate bar chart
+# Generate bar chart
     fig = px.bar(
         pivot_df,
         x="Category",
         y=["לפני ה7.10", "אחרי ה7.10"],
         barmode="group",
         labels={"value": "כמות עבירות מנורמלת", "variable": "תקופה"},
-        title=f"פשיעה במחוז: {selected_district}"
+        title=f"פשיעה ב{selected_district}"  # Update title to "פשיעה ב"
     ).update_layout(
         xaxis_title="סוגי עבירות",
         yaxis_title="כמות עבירות מנורמלת",
         legend_title="תקופה",
         plot_bgcolor="#f9f9f9",
+        title=dict(
+            text=f"פשיעה ב{selected_district}",  # Update title to "פשיעה ב"
+            x=1,  # Align title to the right
+            xanchor="right",  # Anchor title to the right
+            font=dict(size=24)  # Adjust font size
+        ),
         yaxis=dict(
             tickmode="linear",
             tick0=0,
